@@ -29,8 +29,8 @@ export async function handleSignIn(req, res) {
     if (data?.session?.access_token) {
       res.cookie("access_token", data.session.access_token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
+        secure: true, // Always true for cross-origin cookies (required with SameSite=None)
+        sameSite: "none", // Required for cross-origin requests
         maxAge: 60 * 60 * 24 * 7 * 1000 // 7 days
       })
     }
@@ -76,8 +76,8 @@ export async function handleSignOut(req, res) {
     // Clear the cookie
     res.clearCookie("access_token", {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax"
+      secure: true, // Must match the cookie settings
+      sameSite: "none" // Must match the cookie settings
     })
     
     return res.status(200).json({ message: "Sign out successful" })
@@ -85,8 +85,8 @@ export async function handleSignOut(req, res) {
     // Clear cookie even if signout fails
     res.clearCookie("access_token", {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax"
+      secure: true, // Must match the cookie settings
+      sameSite: "none" // Must match the cookie settings
     })
     return res.status(200).json({ message: "Sign out successful" })
   }
