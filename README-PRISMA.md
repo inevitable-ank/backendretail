@@ -102,3 +102,4 @@ const user = await prisma.user.update({
 - **Migration Fails**: Check if table already exists in Supabase
 - **Client Not Found**: Run `npm run prisma:generate`
 
+
