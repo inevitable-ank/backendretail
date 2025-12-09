@@ -21,27 +21,20 @@ export async function getTransactions({
   const where = {}
   const andConditions = []
 
-  // Search: optimized case-insensitive search on customerName and phoneNumber
-  // Use startsWith for better index performance (much faster than contains)
-  // Require minimum 2 characters to avoid expensive queries
   if (search && search.trim().length >= 2) {
     const searchTerm = search.trim()
     
     if (/^\d+$/.test(searchTerm)) {
-      // If search is all digits, treat as phone number search (efficient)
       andConditions.push({
         phoneNumber: {
           startsWith: searchTerm,
         },
       })
     } else {
-      // For text searches, split multi-word searches intelligently
-      // Use first word for startsWith (fast), and handle full name searches
       const words = searchTerm.split(/\s+/).filter(w => w.length > 0)
       const firstWord = words[0]
       
       if (words.length === 1) {
-        // Single word: use startsWith for fast index lookup
         andConditions.push({
           customerName: {
             startsWith: firstWord,
@@ -49,9 +42,6 @@ export async function getTransactions({
           },
         })
       } else {
-        // Multi-word: search for names that start with first word
-        // This handles "Aiisha Agarwal" -> searches for names starting with "Aiisha"
-        // Much faster than contains on full string
         andConditions.push({
           customerName: {
             startsWith: firstWord,
@@ -61,7 +51,7 @@ export async function getTransactions({
       }
     }
   } else if (search && search.trim().length === 1) {
-    // Single character: only search phone numbers (more efficient)
+
     andConditions.push({
       phoneNumber: {
         startsWith: search.trim(),
@@ -69,7 +59,7 @@ export async function getTransactions({
     })
   }
 
-  // Tags filter: stored as comma-separated string
+
   if (filters.tags && filters.tags.length > 0) {
     const tagConditions = filters.tags.map((tag) => ({
       tags: {
@@ -190,21 +180,18 @@ export async function getTransactions({
       },
     })
 
-    // Use Promise.race for timeout protection
     const transactions = await Promise.race([transactionsPromise, timeoutPromise])
     
-    // Only count if we need to (optimization: if we got less than pageSize, we know total)
+
     let totalCount
     if (transactions.length < take && skip === 0) {
-      // If first page and got less than pageSize, total is just the length
       totalCount = transactions.length
     } else {
-      // Otherwise, do the count query (but with timeout protection)
+
       const countPromise = prisma.transaction.count({ where })
       totalCount = await Promise.race([countPromise, timeoutPromise])
     }
 
-    // Convert Decimal to Number for JSON serialization
     const formattedTransactions = transactions.map((t) => ({
       ...t,
       totalAmount: Number(t.totalAmount),
@@ -221,10 +208,8 @@ export async function getTransactions({
       },
     }
   } catch (error) {
-    // Handle timeout - return empty results instead of error for better UX
     if (error.message === "Query timeout" || error.message.includes("timeout") || error.message.includes("statement timeout")) {
-      // Return empty results instead of throwing error
-      // This provides better UX - user sees "no results" instead of error
+
       return {
         transactions: [],
         pagination: {
@@ -279,7 +264,7 @@ export async function getFilterOptions() {
     }),
   ])
 
-  // Extract unique tags from comma-separated strings
+
   const uniqueTags = new Set()
   tags.forEach((t) => {
     if (t.tags) {
@@ -302,11 +287,10 @@ export async function getFilterOptions() {
 
 /**
  * Get aggregated statistics
- * @param {Object} filters - Same filters as getTransactions
- * @returns {Promise<Object>} - Statistics
+ * @param {Object} filters 
+ * @returns {Promise<Object>} 
  */
 export async function getStats(filters = {}) {
-  // Check cache first (30 second TTL for stats)
   const cacheKey = cache.generateKey('stats', filters)
   const cached = cache.get(cacheKey)
   if (cached) {
@@ -316,7 +300,6 @@ export async function getStats(filters = {}) {
   const where = {}
   const andConditions = []
 
-  // Apply same filters as transactions query - use AND conditions for consistency
   if (filters.regions && filters.regions.length > 0) {
     andConditions.push({
       customerRegion: { in: filters.regions }
@@ -351,13 +334,10 @@ export async function getStats(filters = {}) {
     })
   }
 
-  // Combine all AND conditions
   if (andConditions.length > 0) {
     where.AND = andConditions
   }
 
-  // Use a single aggregate query to avoid connection pool exhaustion
-  // This is more efficient and works with connection_limit=1
   const stats = await prisma.transaction.aggregate({
     where,
     _sum: {
@@ -377,7 +357,6 @@ export async function getStats(filters = {}) {
     totalDiscount,
   }
 
-  // Cache the result for 30 seconds
   cache.set(cacheKey, result, 30 * 1000)
 
   return result
