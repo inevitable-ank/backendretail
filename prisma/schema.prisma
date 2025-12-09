@@ -65,3 +65,21 @@ model Transaction {
   @@index([transactionId])
   @@map("transactions")
 }
+
+// CSV Upload History - tracks file uploads
+model CsvUpload {
+  id          String   @id @default(uuid()) @db.Uuid
+  fileName    String   @db.Text
+  fileSize    BigInt   @map("file_size")
+  totalRecords Int     @map("total_records")
+  importedRecords Int  @map("imported_records")
+  failedRecords Int     @default(0) @map("failed_records")
+  status      String   @db.Text // "completed", "failed", "processing"
+  errorMessage String? @db.Text @map("error_message")
+  uploadedBy  String?  @db.Text @map("uploaded_by") // User email or ID
+  uploadedAt  DateTime @default(now()) @map("uploaded_at") @db.Timestamptz(6)
+
+  @@index([uploadedAt])
+  @@index([status])
+  @@map("csv_uploads")
+}

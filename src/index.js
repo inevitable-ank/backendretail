@@ -19,6 +19,13 @@ app.use(express.json())
 app.use(morgan("dev"))
 
 app.get("/health", (_req, res) => res.json({ status: "ok" }))
+
+// Log all requests for debugging
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.path}`)
+  next()
+})
+
 app.use("/api/auth", authRoutes)
 app.use("/api/transactions", transactionRoutes)
 

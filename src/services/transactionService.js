@@ -18,25 +18,45 @@ export async function getTransactions({
 
   // Build where clause
   const where = {}
+  const andConditions = []
 
   // Search: case-insensitive search on customerName and phoneNumber
   if (search) {
-    where.OR = [
-      {
-        customerName: {
-          contains: search,
-          mode: "insensitive",
+    andConditions.push({
+      OR: [
+        {
+          customerName: {
+            contains: search,
+            mode: "insensitive",
+          },
         },
-      },
-      {
-        phoneNumber: {
-          contains: search,
+        {
+          phoneNumber: {
+            contains: search,
+          },
         },
-      },
-    ]
+      ],
+    })
   }
 
-  // Filters
+  // Tags filter: stored as comma-separated string
+  if (filters.tags && filters.tags.length > 0) {
+    const tagConditions = filters.tags.map((tag) => ({
+      tags: {
+        contains: tag,
+      },
+    }))
+    andConditions.push({
+      OR: tagConditions,
+    })
+  }
+
+  // Combine AND conditions if any
+  if (andConditions.length > 0) {
+    where.AND = andConditions
+  }
+
+  // Other filters
   if (filters.regions && filters.regions.length > 0) {
     where.customerRegion = {
       in: filters.regions,
@@ -60,15 +80,6 @@ export async function getTransactions({
     where.productCategory = {
       in: filters.categories,
     }
-  }
-
-  if (filters.tags && filters.tags.length > 0) {
-    // Tags are stored as comma-separated string, so we use array overlap
-    where.tags = {
-      not: null,
-    }
-    // For PostgreSQL, we'll use a more complex query for tags
-    // This will be handled in a separate condition
   }
 
   if (filters.paymentMethods && filters.paymentMethods.length > 0) {

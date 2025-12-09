@@ -5,6 +5,7 @@ import {
   getFilterOptionsHandler,
   getStatsHandler,
   uploadTransactionsHandler,
+  getUploadHistoryHandler,
 } from "../controllers/transactionController.js"
 
 const router = express.Router()
@@ -28,6 +29,9 @@ router.get("/stats", getStatsHandler)
 
 // Upload CSV file
 router.post("/upload", upload.single("file"), uploadTransactionsHandler)
+
+// Get upload history
+router.get("/uploads", getUploadHistoryHandler)
 
 export default router
 
