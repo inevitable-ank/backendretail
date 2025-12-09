@@ -51,48 +51,65 @@ export async function getTransactions({
     })
   }
 
-  // Combine AND conditions if any
+  // Region filter - add to AND conditions to ensure proper combination
+  if (filters.regions && filters.regions.length > 0) {
+    andConditions.push({
+      customerRegion: {
+        in: filters.regions,
+      },
+    })
+  }
+
+  // Gender filter
+  if (filters.genders && filters.genders.length > 0) {
+    andConditions.push({
+      gender: {
+        in: filters.genders,
+      },
+    })
+  }
+
+  // Age range filter
+  if (filters.ageRange && filters.ageRange.length === 2) {
+    andConditions.push({
+      age: {
+        gte: filters.ageRange[0],
+        lte: filters.ageRange[1],
+      },
+    })
+  }
+
+  // Category filter
+  if (filters.categories && filters.categories.length > 0) {
+    andConditions.push({
+      productCategory: {
+        in: filters.categories,
+      },
+    })
+  }
+
+  // Payment method filter
+  if (filters.paymentMethods && filters.paymentMethods.length > 0) {
+    andConditions.push({
+      paymentMethod: {
+        in: filters.paymentMethods,
+      },
+    })
+  }
+
+  // Date range filter
+  if (filters.dateRange && filters.dateRange.length === 2) {
+    andConditions.push({
+      date: {
+        gte: new Date(filters.dateRange[0]),
+        lte: new Date(filters.dateRange[1]),
+      },
+    })
+  }
+
+  // Combine all AND conditions
   if (andConditions.length > 0) {
     where.AND = andConditions
-  }
-
-  // Other filters
-  if (filters.regions && filters.regions.length > 0) {
-    where.customerRegion = {
-      in: filters.regions,
-    }
-  }
-
-  if (filters.genders && filters.genders.length > 0) {
-    where.gender = {
-      in: filters.genders,
-    }
-  }
-
-  if (filters.ageRange && filters.ageRange.length === 2) {
-    where.age = {
-      gte: filters.ageRange[0],
-      lte: filters.ageRange[1],
-    }
-  }
-
-  if (filters.categories && filters.categories.length > 0) {
-    where.productCategory = {
-      in: filters.categories,
-    }
-  }
-
-  if (filters.paymentMethods && filters.paymentMethods.length > 0) {
-    where.paymentMethod = {
-      in: filters.paymentMethods,
-    }
-  }
-
-  if (filters.dateRange && filters.dateRange.length === 2) {
-    where.date = {
-      gte: new Date(filters.dateRange[0]),
-      lte: new Date(filters.dateRange[1]),
-    }
   }
 
   // Build orderBy clause
@@ -222,56 +239,67 @@ export async function getFilterOptions() {
  */
 export async function getStats(filters = {}) {
   const where = {}
+  const andConditions = []
 
-  // Apply same filters as transactions query
+  // Apply same filters as transactions query - use AND conditions for consistency
   if (filters.regions && filters.regions.length > 0) {
-    where.customerRegion = { in: filters.regions }
+    andConditions.push({
+      customerRegion: { in: filters.regions }
+    })
   }
   if (filters.genders && filters.genders.length > 0) {
-    where.gender = { in: filters.genders }
+    andConditions.push({
+      gender: { in: filters.genders }
+    })
   }
   if (filters.ageRange && filters.ageRange.length === 2) {
-    where.age = { gte: filters.ageRange[0], lte: filters.ageRange[1] }
+    andConditions.push({
+      age: { gte: filters.ageRange[0], lte: filters.ageRange[1] }
+    })
   }
   if (filters.categories && filters.categories.length > 0) {
-    where.productCategory = { in: filters.categories }
+    andConditions.push({
+      productCategory: { in: filters.categories }
+    })
   }
   if (filters.paymentMethods && filters.paymentMethods.length > 0) {
-    where.paymentMethod = { in: filters.paymentMethods }
+    andConditions.push({
+      paymentMethod: { in: filters.paymentMethods }
+    })
   }
   if (filters.dateRange && filters.dateRange.length === 2) {
-    where.date = {
-      gte: new Date(filters.dateRange[0]),
-      lte: new Date(filters.dateRange[1]),
-    }
+    andConditions.push({
+      date: {
+        gte: new Date(filters.dateRange[0]),
+        lte: new Date(filters.dateRange[1]),
+      }
+    })
   }
 
-  const [totalUnits, totalAmount, totalDiscount] = await Promise.all([
-    prisma.transaction.aggregate({
-      where,
-      _sum: { quantity: true },
-    }),
-    prisma.transaction.aggregate({
-      where,
-      _sum: { totalAmount: true },
-    }),
-    prisma.transaction.aggregate({
-      where,
-      _sum: {
-        totalAmount: true,
-        finalAmount: true,
-      },
-    }),
-  ])
+  // Combine all AND conditions
+  if (andConditions.length > 0) {
+    where.AND = andConditions
+  }
 
-  const discountTotal =
-    Number(totalDiscount._sum.totalAmount || 0) -
-    Number(totalDiscount._sum.finalAmount || 0)
+  // Use a single aggregate query to avoid connection pool exhaustion
+  // This is more efficient and works with connection_limit=1
+  const stats = await prisma.transaction.aggregate({
+    where,
+    _sum: {
+      quantity: true,
+      totalAmount: true,
+      finalAmount: true,
+    },
+  })
+
+  const totalUnits = Number(stats._sum.quantity || 0)
+  const totalAmount = Number(stats._sum.totalAmount || 0)
+  const totalDiscount = totalAmount - Number(stats._sum.finalAmount || 0)
 
   return {
-    totalUnits: Number(totalUnits._sum.quantity || 0),
-    totalAmount: Number(totalAmount._sum.totalAmount || 0),
-    totalDiscount: discountTotal,
+    totalUnits,
+    totalAmount,
+    totalDiscount,
   }
 }
 
