@@ -122,6 +122,15 @@ Frontend will run on `http://localhost:3000`
 4. Wait for import to complete
 5. View transactions on the main dashboard
 
+### Test Credentials
+
+A demo account with pre-loaded dataset is available for testing:
+
+- **Email:** `cemewox288@asurad.com`
+- **Password:** `Password@123`
+
+This account contains sample transaction data that you can use to test the search, filtering, sorting, and pagination features.
+
 ### Verification
 
 - Backend health check: `http://localhost:4000/health`
