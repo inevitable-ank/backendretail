@@ -1,4 +1,5 @@
 import { prisma } from "../utils/prisma.js"
+import { cache } from "../utils/cache.js"
 
 /**
  * Get transactions with search, filter, sort, and pagination
@@ -238,6 +239,13 @@ export async function getFilterOptions() {
  * @returns {Promise<Object>} - Statistics
  */
 export async function getStats(filters = {}) {
+  // Check cache first (30 second TTL for stats)
+  const cacheKey = cache.generateKey('stats', filters)
+  const cached = cache.get(cacheKey)
+  if (cached) {
+    return cached
+  }
+
   const where = {}
   const andConditions = []
 
@@ -296,10 +304,15 @@ export async function getStats(filters = {}) {
   const totalAmount = Number(stats._sum.totalAmount || 0)
   const totalDiscount = totalAmount - Number(stats._sum.finalAmount || 0)
 
-  return {
+  const result = {
     totalUnits,
     totalAmount,
     totalDiscount,
   }
+
+  // Cache the result for 30 seconds
+  cache.set(cacheKey, result, 30 * 1000)
+
+  return result
 }
 

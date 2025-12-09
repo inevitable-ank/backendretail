@@ -63,6 +63,13 @@ model Transaction {
   @@index([paymentMethod])
   @@index([date])
   @@index([transactionId])
+  
+  // Composite indexes for common filter combinations (improves stats query performance)
+  @@index([customerRegion, date])
+  @@index([customerRegion, productCategory])
+  @@index([customerRegion, gender])
+  @@index([date, productCategory])
+  @@index([customerRegion, date, productCategory])
   @@map("transactions")
 }
 

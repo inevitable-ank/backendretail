@@ -1,4 +1,5 @@
 import { prisma } from "../utils/prisma.js"
+import { cache } from "../utils/cache.js"
 import { parse } from "csv-parse/sync"
 import { Readable } from "stream"
 import fs from "fs"
@@ -86,6 +87,9 @@ export async function importTransactionsFromCSV(filePath, progressCallback = nul
         })
       }
     }
+
+    // Clear stats cache after importing new data
+    cache.clear()
 
     return {
       success: true,
@@ -203,6 +207,9 @@ export async function importTransactionsFromBuffer(fileBuffer, progressCallback 
         })
       }
     }
+
+    // Clear stats cache after importing new data
+    cache.clear()
 
     return {
       success: true,
