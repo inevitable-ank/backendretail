@@ -5,6 +5,7 @@ import morgan from "morgan"
 import cookieParser from "cookie-parser"
 
 import authRoutes from "./routes/authRoutes.js"
+import transactionRoutes from "./routes/transactionRoutes.js"
 
 const app = express()
 const PORT = process.env.PORT || 4000
@@ -19,6 +20,7 @@ app.use(morgan("dev"))
 
 app.get("/health", (_req, res) => res.json({ status: "ok" }))
 app.use("/api/auth", authRoutes)
+app.use("/api/transactions", transactionRoutes)
 
 // 404 handler
 app.use((req, res) => {

@@ -20,3 +20,48 @@ model User {
 
   @@map("users")
 }
+
+// Transaction table - stores retail sales transaction data
+model Transaction {
+  id                String   @id @default(uuid()) @db.Uuid
+  transactionId     String   @unique @db.Text
+  date              DateTime @db.Date
+  customerId        String   @db.Text
+  customerName      String   @db.Text
+  phoneNumber       String   @db.Text
+  gender            String   @db.Text
+  age               Int
+  customerRegion    String   @db.Text
+  customerType      String?  @db.Text
+  productId         String   @db.Text
+  productName       String?  @db.Text
+  brand             String?  @db.Text
+  productCategory   String   @db.Text
+  tags              String?  @db.Text // Stored as comma-separated string
+  quantity          Int
+  pricePerUnit      Decimal  @db.Decimal(12, 2)
+  discountPercentage Decimal @db.Decimal(5, 2) @map("discount_percentage")
+  totalAmount       Decimal  @db.Decimal(12, 2)
+  finalAmount       Decimal  @db.Decimal(12, 2)
+  paymentMethod     String   @db.Text
+  orderStatus       String?  @db.Text
+  deliveryType      String?  @db.Text
+  storeId           String?  @db.Text
+  storeLocation     String?  @db.Text
+  salespersonId     String?  @db.Text
+  employeeName      String   @db.Text
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Indexes for performance optimization
+  @@index([customerName])
+  @@index([phoneNumber])
+  @@index([customerRegion])
+  @@index([gender])
+  @@index([age])
+  @@index([productCategory])
+  @@index([paymentMethod])
+  @@index([date])
+  @@index([transactionId])
+  @@map("transactions")
+}
