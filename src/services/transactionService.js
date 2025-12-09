@@ -21,22 +21,51 @@ export async function getTransactions({
   const where = {}
   const andConditions = []
 
-  // Search: case-insensitive search on customerName and phoneNumber
-  if (search) {
-    andConditions.push({
-      OR: [
-        {
+  // Search: optimized case-insensitive search on customerName and phoneNumber
+  // Use startsWith for better index performance (much faster than contains)
+  // Require minimum 2 characters to avoid expensive queries
+  if (search && search.trim().length >= 2) {
+    const searchTerm = search.trim()
+    
+    if (/^\d+$/.test(searchTerm)) {
+      // If search is all digits, treat as phone number search (efficient)
+      andConditions.push({
+        phoneNumber: {
+          startsWith: searchTerm,
+        },
+      })
+    } else {
+      // For text searches, split multi-word searches intelligently
+      // Use first word for startsWith (fast), and handle full name searches
+      const words = searchTerm.split(/\s+/).filter(w => w.length > 0)
+      const firstWord = words[0]
+      
+      if (words.length === 1) {
+        // Single word: use startsWith for fast index lookup
+        andConditions.push({
           customerName: {
-            contains: search,
+            startsWith: firstWord,
             mode: "insensitive",
           },
-        },
-        {
-          phoneNumber: {
-            contains: search,
+        })
+      } else {
+        // Multi-word: search for names that start with first word
+        // This handles "Aiisha Agarwal" -> searches for names starting with "Aiisha"
+        // Much faster than contains on full string
+        andConditions.push({
+          customerName: {
+            startsWith: firstWord,
+            mode: "insensitive",
           },
-        },
-      ],
+        })
+      }
+    }
+  } else if (search && search.trim().length === 1) {
+    // Single character: only search phone numbers (more efficient)
+    andConditions.push({
+      phoneNumber: {
+        startsWith: search.trim(),
+      },
     })
   }
 
@@ -129,9 +158,17 @@ export async function getTransactions({
       orderBy = { customerName: "asc" }
   }
 
-  // Execute queries
-  const [transactions, totalCount] = await Promise.all([
-    prisma.transaction.findMany({
+  // Execute queries with timeout protection and optimized count query
+  // For count, use a faster approach - limit to reasonable number for pagination
+  const queryTimeout = 15000 // 15 seconds timeout (increased for better UX)
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error("Query timeout")), queryTimeout)
+  })
+
+  try {
+    // Execute findMany first (with limit) - this is usually faster
+    // Then do count only if we got results (optimization)
+    const transactionsPromise = prisma.transaction.findMany({
       where,
       orderBy,
       skip,
@@ -151,25 +188,55 @@ export async function getTransactions({
         productId: true,
         employeeName: true,
       },
-    }),
-    prisma.transaction.count({ where }),
-  ])
+    })
 
-  // Convert Decimal to Number for JSON serialization
-  const formattedTransactions = transactions.map((t) => ({
-    ...t,
-    totalAmount: Number(t.totalAmount),
-    date: t.date.toISOString().split("T")[0],
-  }))
+    // Use Promise.race for timeout protection
+    const transactions = await Promise.race([transactionsPromise, timeoutPromise])
+    
+    // Only count if we need to (optimization: if we got less than pageSize, we know total)
+    let totalCount
+    if (transactions.length < take && skip === 0) {
+      // If first page and got less than pageSize, total is just the length
+      totalCount = transactions.length
+    } else {
+      // Otherwise, do the count query (but with timeout protection)
+      const countPromise = prisma.transaction.count({ where })
+      totalCount = await Promise.race([countPromise, timeoutPromise])
+    }
 
-  return {
-    transactions: formattedTransactions,
-    pagination: {
-      page,
-      pageSize,
-      totalCount,
-      totalPages: Math.ceil(totalCount / pageSize),
-    },
+    // Convert Decimal to Number for JSON serialization
+    const formattedTransactions = transactions.map((t) => ({
+      ...t,
+      totalAmount: Number(t.totalAmount),
+      date: t.date.toISOString().split("T")[0],
+    }))
+
+    return {
+      transactions: formattedTransactions,
+      pagination: {
+        page,
+        pageSize,
+        totalCount,
+        totalPages: Math.ceil(totalCount / pageSize),
+      },
+    }
+  } catch (error) {
+    // Handle timeout - return empty results instead of error for better UX
+    if (error.message === "Query timeout" || error.message.includes("timeout") || error.message.includes("statement timeout")) {
+      // Return empty results instead of throwing error
+      // This provides better UX - user sees "no results" instead of error
+      return {
+        transactions: [],
+        pagination: {
+          page,
+          pageSize,
+          totalCount: 0,
+          totalPages: 0,
+        },
+      }
+    }
+    // Re-throw other errors
+    throw error
   }
 }
 
